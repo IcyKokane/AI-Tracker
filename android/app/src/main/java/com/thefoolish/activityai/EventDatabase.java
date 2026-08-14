@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public final class EventDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME = "activity_ai.db";
-    private static final int DB_VERSION = 3;
+    private static final int DB_VERSION = 4;
 
     public EventDatabase(Context context) { super(context, DB_NAME, null, DB_VERSION); }
 
@@ -20,13 +20,24 @@ public final class EventDatabase extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX idx_events_started ON events(started_at_ms)");
         db.execSQL("CREATE INDEX idx_events_app ON events(app_id, started_at_ms)");
         db.execSQL("CREATE INDEX idx_events_type_started ON events(event_type, started_at_ms)");
+        db.execSQL("CREATE INDEX idx_events_source_started ON events(source, started_at_ms)");
         db.execSQL("CREATE TABLE privacy_policy (app_id TEXT PRIMARY KEY, telemetry INTEGER NOT NULL DEFAULT 1, metadata INTEGER NOT NULL DEFAULT 0, visual INTEGER NOT NULL DEFAULT 0, content_storage INTEGER NOT NULL DEFAULT 0)");
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS privacy_policy (app_id TEXT PRIMARY KEY, telemetry INTEGER NOT NULL DEFAULT 1, metadata INTEGER NOT NULL DEFAULT 0, visual INTEGER NOT NULL DEFAULT 0, content_storage INTEGER NOT NULL DEFAULT 0)");
+        if (oldVersion < 2) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS privacy_policy (app_id TEXT PRIMARY KEY, telemetry INTEGER NOT NULL DEFAULT 1, metadata INTEGER NOT NULL DEFAULT 0, visual INTEGER NOT NULL DEFAULT 0, content_storage INTEGER NOT NULL DEFAULT 0)");
+        }
         if (oldVersion < 3) {
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_type_started ON events(event_type, started_at_ms)");
+        }
+        if (oldVersion < 4) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_source_started ON events(source, started_at_ms)");
+            // Earlier Milestone-1 builds used more than one label for completed usage rows.
+            // A completed usage row is defined structurally, then normalized to the canonical type.
+            db.execSQL("UPDATE events SET event_type='session' " +
+                    "WHERE platform='android' AND source='usage_stats' " +
+                    "AND ended_at_ms IS NOT NULL AND duration_ms IS NOT NULL AND duration_ms>0");
         }
     }
 }
