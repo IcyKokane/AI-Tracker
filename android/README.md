@@ -1,4 +1,4 @@
-# Activity AI Android — Milestone 1 Pass 3
+# Activity AI Android — Milestone 1 First Device Test
 
 ## Current behavior
 
@@ -9,3 +9,5 @@
 5. Per-app telemetry defaults ON; Level-2 metadata, Level-3 visual observation, and raw content storage default OFF.
 
 The app currently requests only Usage Stats access plus boot-completed delivery. Location, Accessibility, and MediaProjection are intentionally not part of Milestone 1.
+
+This repository is configured to build the first debug APK through GitHub Actions.
