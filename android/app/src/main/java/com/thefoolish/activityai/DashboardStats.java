@@ -22,13 +22,15 @@ public final class DashboardStats {
     public Snapshot between(long startMs, long endMs) {
         SQLiteDatabase r = db.getReadableDatabase();
         String overlap = "MAX(0, MIN(COALESCE(ended_at_ms, ?), ?) - MAX(started_at_ms, ?))";
+        String completedUsage = "platform='android' AND source='usage_stats' " +
+                "AND ended_at_ms IS NOT NULL AND duration_ms IS NOT NULL AND duration_ms>0";
         String sql = "SELECT COUNT(*), COUNT(DISTINCT app_id), COALESCE(SUM(" + overlap + "),0), " +
-                "COALESCE(AVG(" + overlap + "),0) FROM events WHERE event_type='session' " +
-                "AND started_at_ms<? AND COALESCE(ended_at_ms, ?) > ?";
+                "COALESCE(AVG(" + overlap + "),0) FROM events WHERE " + completedUsage + " " +
+                "AND started_at_ms<? AND ended_at_ms>?";
         String[] args = new String[]{
                 Long.toString(endMs), Long.toString(endMs), Long.toString(startMs),
                 Long.toString(endMs), Long.toString(endMs), Long.toString(startMs),
-                Long.toString(endMs), Long.toString(endMs), Long.toString(startMs)
+                Long.toString(endMs), Long.toString(startMs)
         };
         try (Cursor c = r.rawQuery(sql, args)) {
             if (c.moveToFirst()) return new Snapshot(c.getInt(0), c.getInt(1), c.getLong(2), c.getLong(3));
