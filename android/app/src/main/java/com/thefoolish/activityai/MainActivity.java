@@ -11,6 +11,8 @@ import java.time.ZoneId;
 import java.util.List;
 
 public final class MainActivity extends Activity {
+    private static final long MIN_TOP_APP_MS = 60_000L;
+
     private TextView status;
     private TextView summary;
     private TextView report;
@@ -39,6 +41,7 @@ public final class MainActivity extends Activity {
             report.setText("");
             return;
         }
+
         ZoneId zone = ZoneId.systemDefault();
         LocalDate today = LocalDate.now();
         long start = today.atStartOfDay(zone).toInstant().toEpochMilli();
@@ -55,9 +58,14 @@ public final class MainActivity extends Activity {
         CollectorHealth.Snapshot health = new CollectorHealth(this).read();
 
         long liveTotal = 0;
-        for (UsageCollector.Total t : totals) liveTotal += t.durationMs;
+        int meaningfulApps = 0;
+        for (UsageCollector.Total t : totals) {
+            liveTotal += t.durationMs;
+            if (t.durationMs >= MIN_TOP_APP_MS) meaningfulApps++;
+        }
+
         String delta = comparison(stored.trackedMs, previous.trackedMs);
-        summary.setText("Today: " + format(liveTotal) + " foreground • " + totals.size() +
+        summary.setText("Today: " + format(liveTotal) + " foreground • " + meaningfulApps +
                 " active apps\nCompleted sessions: " + stored.sessions +
                 " • average " + format(stored.averageSessionMs) +
                 "\nStored time vs yesterday: " + delta +
@@ -67,10 +75,11 @@ public final class MainActivity extends Activity {
         StringBuilder b = new StringBuilder("Top apps today\n\n");
         int shown = 0;
         for (UsageCollector.Total t : totals) {
+            if (t.durationMs < MIN_TOP_APP_MS) continue;
             if (shown++ >= 20) break;
             b.append(t.appName).append(" — ").append(format(t.durationMs)).append('\n');
         }
-        if (totals.isEmpty()) b.append("No foreground sessions detected yet.");
+        if (shown == 0) b.append("No apps have reached one minute of foreground use yet.");
         report.setText(b.toString());
     }
 
@@ -83,6 +92,6 @@ public final class MainActivity extends Activity {
 
     private static String format(long ms) {
         long min = Math.max(0L, ms) / 60000L;
-        return (min/60) + "h " + (min%60) + "m";
+        return (min / 60L) + "h " + (min % 60L) + "m";
     }
 }
