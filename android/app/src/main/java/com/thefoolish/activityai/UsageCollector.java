@@ -19,6 +19,7 @@ import java.util.Map;
 
 public final class UsageCollector {
     private static final long STATE_LOOKBACK_MS = 24L * 60L * 60L * 1000L;
+    private static final long MAX_REASONABLE_SESSION_MS = 24L * 60L * 60L * 1000L;
 
     public static final class Total {
         public final String packageName;
@@ -124,12 +125,21 @@ public final class UsageCollector {
     private void close(String pkg, long began, long ended, long rangeStart, long rangeEnd,
                        Map<String, Long> totals, SQLiteDatabase out) {
         if (pkg == null || began < 0 || ended <= began) return;
-        long start = Math.max(began, rangeStart);
-        long end = Math.min(ended, rangeEnd);
-        if (end <= start) return;
-        long duration = end - start;
-        totals.put(pkg, totals.getOrDefault(pkg, 0L) + duration);
-        insertSession(out, pkg, start, end, duration);
+
+        // Reporting uses the overlap with the requested range.
+        long clippedStart = Math.max(began, rangeStart);
+        long clippedEnd = Math.min(ended, rangeEnd);
+        if (clippedEnd > clippedStart) {
+            totals.put(pkg, totals.getOrDefault(pkg, 0L) + (clippedEnd - clippedStart));
+        }
+
+        // Persistence MUST use the original Android event timestamps. If a rolling 24-hour
+        // background pass and a calendar-day dashboard pass see the same real session, they
+        // now generate the same ID and CONFLICT_IGNORE makes the operation idempotent.
+        long rawDuration = ended - began;
+        if (rawDuration > 0L && rawDuration <= MAX_REASONABLE_SESSION_MS) {
+            insertSession(out, pkg, began, ended, rawDuration);
+        }
     }
 
     private void insertSession(SQLiteDatabase out, String pkg, long start, long end, long duration) {
