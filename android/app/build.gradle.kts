@@ -8,7 +8,7 @@ android {
         applicationId = "com.thefoolish.activityai"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.1-m1-normalizationfix"
+        versionCode = 4
+        versionName = "0.1.2-m1-idempotencyfix"
     }
 }
