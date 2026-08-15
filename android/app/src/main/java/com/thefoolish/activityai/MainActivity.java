@@ -50,7 +50,12 @@ public final class MainActivity extends Activity {
         long previousEnd = start;
         long sevenDayStart = today.minusDays(6).atStartOfDay(zone).toInstant().toEpochMilli();
 
-        List<UsageCollector.Total> totals = new UsageCollector(this).collectRange(start, end);
+        UsageCollector collector = new UsageCollector(this);
+        // Rebuild/maintain a deterministic recent history first. Because session IDs now use
+        // raw Android event boundaries, this pass is safe to repeat and does not duplicate rows.
+        collector.collectRange(sevenDayStart, end);
+        List<UsageCollector.Total> totals = collector.collectRange(start, end);
+
         DashboardStats statsReader = new DashboardStats(this);
         DashboardStats.Snapshot stored = statsReader.between(start, end);
         DashboardStats.Snapshot previous = statsReader.between(previousStart, previousEnd);
@@ -64,12 +69,19 @@ public final class MainActivity extends Activity {
             if (t.durationMs >= MIN_TOP_APP_MS) meaningfulApps++;
         }
 
-        String delta = comparison(stored.trackedMs, previous.trackedMs);
+        String historicalLine;
+        if (!stored.sane || !previous.sane || !sevenDays.sane) {
+            historicalLine = "Historical stats: repairing invalid overlap data";
+        } else {
+            String delta = comparison(stored.trackedMs, previous.trackedMs);
+            historicalLine = "Stored time vs yesterday: " + delta +
+                    " • 7-day daily avg: " + format(sevenDays.trackedMs / 7L);
+        }
+
         summary.setText("Today: " + format(liveTotal) + " foreground • " + meaningfulApps +
-                " active apps\nCompleted sessions: " + stored.sessions +
-                " • average " + format(stored.averageSessionMs) +
-                "\nStored time vs yesterday: " + delta +
-                " • 7-day daily avg: " + format(sevenDays.trackedMs / 7L) +
+                " active apps\nCompleted sessions: " + (stored.sane ? stored.sessions : 0) +
+                " • average " + (stored.sane ? format(stored.averageSessionMs) : "repairing") +
+                "\n" + historicalLine +
                 "\nCollector DB: " + health.databaseState + " • stored events: " + health.eventCount);
 
         StringBuilder b = new StringBuilder("Top apps today\n\n");
