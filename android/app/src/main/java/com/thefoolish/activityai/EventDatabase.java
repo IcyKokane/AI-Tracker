@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public final class EventDatabase extends SQLiteOpenHelper {
     private static final String DB_NAME = "activity_ai.db";
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
 
     public EventDatabase(Context context) { super(context, DB_NAME, null, DB_VERSION); }
 
@@ -33,11 +33,16 @@ public final class EventDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 4) {
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_source_started ON events(source, started_at_ms)");
-            // Earlier Milestone-1 builds used more than one label for completed usage rows.
-            // A completed usage row is defined structurally, then normalized to the canonical type.
             db.execSQL("UPDATE events SET event_type='session' " +
                     "WHERE platform='android' AND source='usage_stats' " +
                     "AND ended_at_ms IS NOT NULL AND duration_ms IS NOT NULL AND duration_ms>0");
+        }
+        if (oldVersion < 5) {
+            // v4 could persist the same Android session multiple times because session IDs were
+            // based on report-clipped timestamps. Those rows cannot be reliably de-duplicated,
+            // so discard only Android usage_stats sessions and rebuild them deterministically.
+            // Privacy policies and all non-Android/non-usage telemetry are preserved.
+            db.execSQL("DELETE FROM events WHERE platform='android' AND source='usage_stats'");
         }
     }
 }
